@@ -3,16 +3,24 @@ import bmesh
 import re
 import math
 
-file_path = "D:/Downloads/nmea.txt"  # Replace with your file path
+use_prdid = True
+file_path = ""  # Replace with your file path
+vehicle_height_offset = 1
+roll_offset = 0
+pitch_offset = 0
+heading_offset = 0
 # Initialize empty lists to store the extracted data
 timestamps = []
 latitudes = []
 longitudes = []
+rolls = []
+pitches = []
 headings = []
 
 # Regular expressions for parsing the NMEA sentences
 gga_pattern = re.compile(r"\$GNGGA,(\d+.\d+),(\d+.\d+),(N|S),(\d+.\d+),(E|W),.*")
 hdt_pattern = re.compile(r"\$HEHDT,(\d+.\d+),T.*")
+prdid_pattern = re.compile(r"\$PRDID,(-?\d+.\d+),(-?\d+.\d+),(-?\d+.\d+)\*.*")
 
 # see conversion formulas at
 # http://en.wikipedia.org/wiki/Transverse_Mercator_projection
@@ -68,16 +76,27 @@ with open(file_path, 'r') as f:
             temp_lat = float(gga_match.group(2))
             temp_long = float(gga_match.group(4))
 
-        # Match HDT sentence for heading
-        hdt_match = hdt_pattern.match(line)
-        if hdt_match:
-            temp_heading = float(hdt_match.group(1))
+
+        if use_prdid:
+            prdid_match = prdid_pattern.match(line)
+            if prdid_match:
+                temp_roll = float(prdid_match.group(3))
+                temp_pitch = float(prdid_match.group(3))
+                temp_heading = float(prdid_match.group(3))
+
+        else:
+            # Match HDT sentence for heading        
+            hdt_match = hdt_pattern.match(line)
+            if hdt_match:
+                temp_heading = float(hdt_match.group(1))
 
         # Only append data when both position and heading are available
         if temp_time and temp_lat and temp_long and temp_heading:
             timestamps.append(temp_time)
             latitudes.append(temp_lat)
             longitudes.append(temp_long)
+            rolls.append(temp_roll)
+            pitches.append(temp_pitch)
             headings.append(temp_heading)
 
             # Reset temp variables
@@ -103,18 +122,18 @@ bpy.context.scene.render.fps = 24
 # Loop through each data point to set position and keyframe
 for i in range(len(timestamps)):
     frame_number = i * 2  # You can adjust this to control speed
-    logger_latitude = 3540.8061
-    lat_decimal, lat_integer = math.modf(latitudes[i]/100/100.0)
+    lat_decimal, lat_integer = math.modf(latitudes[i]/100.0)
     gps_latitude = lat_integer + lat_decimal / 60.0 * 100.0
-    lon_decimal, lon_integer = math.modf(longitudes[i]/100/100.0)
+    lon_decimal, lon_integer = math.modf(longitudes[i]/100.0)
     gps_longitude = lon_integer + lon_decimal / 60.0 * 100.0
     (x,y,z) = projection.fromGeographic(gps_latitude, gps_longitude)
     
     # Set car position
-    car_object.location = (x, y, z)
-    
+    car_object.location = (x, y, vehicle_height_offset)
     # Set car rotation based on heading
-    #car_object.rotation_euler.z = headings[i]  # Assuming heading is in radians
+    #car_object.rotation_euler.x = (rolls[i] - pitch_offset) * math.pi /180  # Assuming heading is in radians
+    #car_object.rotation_euler.y = ( pitches[i] - roll_offset) * math.pi /180  # Assuming heading is in radians
+    car_object.rotation_euler.z = ( - headings[i] - heading_offset) * math.pi /180  # Assuming heading is in radians
     
     # Insert keyframes
     car_object.keyframe_insert(data_path="location", frame=frame_number)
