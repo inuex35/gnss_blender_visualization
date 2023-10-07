@@ -3,7 +3,7 @@ import bmesh
 import re
 import math
 
-file_path = ""  # Replace with your file path
+file_path = "D:/Downloads/nmea.txt"  # Replace with your file path
 # Initialize empty lists to store the extracted data
 timestamps = []
 latitudes = []
@@ -103,8 +103,12 @@ bpy.context.scene.render.fps = 24
 # Loop through each data point to set position and keyframe
 for i in range(len(timestamps)):
     frame_number = i * 2  # You can adjust this to control speed
-    
-    (x,y,z) = projection.fromGeographic(latitudes[i]/100, longitudes[i]/100)
+    logger_latitude = 3540.8061
+    lat_decimal, lat_integer = math.modf(latitudes[i]/100/100.0)
+    gps_latitude = lat_integer + lat_decimal / 60.0 * 100.0
+    lon_decimal, lon_integer = math.modf(longitudes[i]/100/100.0)
+    gps_longitude = lon_integer + lon_decimal / 60.0 * 100.0
+    (x,y,z) = projection.fromGeographic(gps_latitude, gps_longitude)
     
     # Set car position
     car_object.location = (x, y, z)
